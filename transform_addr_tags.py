@@ -27,6 +27,7 @@ def main(infile, outfilename):
             continue
         street_suffix_node = node.find("tag[@k='SUFFIX']")
         street_prefix_node = node.find("tag[@k='PREFIX']")
+        zip_node = node.find("tag[@k='ZIP']")
         #import code; code.interact(local=locals())
 
         suffix = None
@@ -59,10 +60,16 @@ def main(infile, outfilename):
         if suffix:
             street = street + " " + suffix
 
-        newnode(processed_root, node.attrib['lat'], node.attrib['lon'], {
+
+        new_tags = {
             "addr:housenumber": house_no_node.attrib['v'],
             "addr:street": street.title()
-        })
+        }
+
+        if zip_node is not None:
+            new_tags['addr:postcode'] = zip_node.attrib['v']
+
+        newnode(processed_root, node.attrib['lat'], node.attrib['lon'], new_tags)
 
     print("%d nodes total" % len(root))
 
