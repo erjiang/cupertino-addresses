@@ -13,6 +13,7 @@ road_types = {
     'BRG': 'Bridge',
     'BYP': 'Bypass',
     'CIR': 'Circle',
+    'CMN': 'Common',
     'CRES': 'Crescent',
     'CSWY': 'Causeway',
     'CT': 'Court',
