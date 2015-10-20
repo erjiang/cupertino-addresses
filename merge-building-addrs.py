@@ -167,9 +167,9 @@ for bldg in bldgs:
         attrs['action'] = 'modify'
 
     elem = ElementTree.SubElement(outroot, "way", attrs)
-    for k in tags:
-        ElementTree.SubElement(elem, 'tag', { 'k': k, 'v': tags[k] })
-    for ref in refs:
+    for k in bldg.tags:
+        ElementTree.SubElement(elem, 'tag', { 'k': k, 'v': bldg.tags[k] })
+    for ref in bldg.refs:
         ElementTree.SubElement(elem, 'nd', { 'ref': str(ref) })
 
 # Add remaining addresses as nodes
