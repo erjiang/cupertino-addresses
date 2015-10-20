@@ -1,6 +1,8 @@
 #! /usr/bin/python2
 # vim: fileencoding=utf-8 et sw=4
 
+from __future__ import division
+
 from collections import namedtuple
 import sys
 import os
@@ -22,24 +24,28 @@ def main():
     bldgroot = ElementTree.parse(sys.argv[1]).getroot()
     print("Loaded buildings XML")
     bldgs, rltns, relation_membership, waynodes = process_buildings(bldgroot, outroot)
-    print("Processed buildings and relations")
+    print("Processed %d buildings and %d relations" % (len(bldgs), len(rltns)))
 
     bldgroot = None # Make python release the XML structure
 
     addrroot = ElementTree.parse(sys.argv[2]).getroot()
+    print("%d elements in addrroot" % (len(addrroot),))
     print("Loaded addresses XML")
     addrs = match_buildings_addrs(addrroot, bldgs, relation_membership, rltns)
-    print("Matched buildings to addresses")
+    print("Matched buildings to %d addresses" % (len(addrs),))
 
     addrroot = None
 
     bound_addrs_bldgs = merge_into_buildings(bldgs, outroot, relation_membership)
     print("Wrote buildings")
+    print("%d bound_addrs_bldgs" % len(bound_addrs_bldgs))
     bound_addrs_rltns = merge_into_relations(rltns, outroot)
     print("Wrote relations")
+    print("%d bound_addrs_rltns" % len(bound_addrs_rltns))
 
     # union addr IDs bound to buildings and relations
     bound_addrs = bound_addrs_bldgs | bound_addrs_rltns
+    print("%d bound addrs" % len(bound_addrs))
 
     output_remaining_addrs(bound_addrs, addrs, outroot)
     print("Wrote remaining addresses")
@@ -62,11 +68,11 @@ def process_buildings(bldgroot, outroot):
     for elem in bldgroot:
         if 'id' not in elem.attrib:
             continue
-        id = int(elem.attrib['id'])
+        obj_id = elem.attrib['id']
         if elem.tag == 'node':
             lat = float(elem.attrib['lat'])
             lon = float(elem.attrib['lon'])
-            waynodes[id] = ( lat, lon )
+            waynodes[obj_id] = (lat, lon)
             outroot.append(elem)
             continue
 
@@ -75,6 +81,7 @@ def process_buildings(bldgroot, outroot):
             for member in elem:
                 if member.tag == 'member':
                     # record that this way belongs to this relation
+                    #print("%s is a relation member" % (member.attrib['ref'],))
                     relation_membership[member.attrib['ref']] = elem.attrib['id']
                     members.append(member)
 
@@ -99,7 +106,7 @@ def process_buildings(bldgroot, outroot):
         # also find some point in the middle of the outline to be used to
         # speed up distance calculation
         if 'version' in elem.attrib:
-            v = int(elem.attrib['version'])
+            v = elem.attrib['version']
         else:
             v = "1"
         if elem.tag == 'way':
@@ -111,7 +118,7 @@ def process_buildings(bldgroot, outroot):
             for sub in elem:
                 if sub.tag != 'nd':
                     continue
-                ref = int(sub.attrib['ref'])
+                ref = sub.attrib['ref']
                 if ref not in waynodes:
                     continue
                 way.append(waynodes[ref])
@@ -124,7 +131,9 @@ def process_buildings(bldgroot, outroot):
             if refs[0] != refs[-1]:
                 outroot.append(elem)
                 continue
-            bldgs.append(Building(lat, lon, way, refs, tags, id, v, []))
+            bldgs.append(Building(lat, lon, way, refs, tags, obj_id, v, []))
+            if obj_id == -234053:
+                print("Appended building %s" % (obj_id,))
         elif elem.tag == 'relation':
             rltns[elem.attrib['id']] = Relation(elem.attrib['id'], members, tags, v, [])
     return bldgs, rltns, relation_membership, waynodes
@@ -158,10 +167,10 @@ def match_buildings_addrs(addrroot, bldgs, relation_membership, rltns):
         lon = float(elem.attrib['lon'])
 
         if 'version' in elem.attrib:
-            v = int(elem.attrib['version'])
+            v = elem.attrib['version']
         else:
             v = 1
-        addr = Addr(lat, lon, tags, int(elem.attrib['id']), v)
+        addr = Addr(lat, lon, tags, elem.attrib['id'], v)
         addrs.append(addr)
 
         # Find what if any building shapes contain this lat/lon
@@ -181,7 +190,7 @@ def match_buildings_addrs(addrroot, bldgs, relation_membership, rltns):
                 #print("Adding addr %s to bldg %s" % (addr.id, bldg.id))
                 bldg.newaddrs.append(addr)
             break
-        return addrs
+    return addrs
 
 
 def merge_into_buildings(bldgs, outroot, relation_membership):
@@ -190,6 +199,8 @@ def merge_into_buildings(bldgs, outroot, relation_membership):
 
     #for lat, lon, way, refs, tags, id, v, newaddrs in bldgs:
     for bldg in bldgs:
+        if str(bldg.id) == "-234053":
+            print("Output bldg %s" % (bldg,))
         attrs = { "version": str(bldg.v), "id": str(bldg.id) }
 
         # If this building contains only a single address node, copy its tags
@@ -221,8 +232,8 @@ def merge_into_relations(rltns, outroot):
         if len(relation.newaddrs) == 1:
             bound_addrs.add(relation.newaddrs[0].id)
             relation.tags.update(relation.newaddrs[0].tags)
-            relation.tags['building'] = 'yes'
             attrs['relation'] = 'modify'
+        relation.tags['building'] = 'yes'
 
         elem = ElementTree.SubElement(outroot, "relation", attrs)
         for k, v in relation.tags.items():
@@ -240,8 +251,8 @@ def output_remaining_addrs(bound_addrs, addrs, outroot):
             continue
 
         i = addr.id
-        if i < 0:
-            i -= 2000000
+        if int(i) < 0:
+            i = int(i) - 2000000
         elem = ElementTree.SubElement(outroot, "node", {
             'lat': str(addr.lat),
             'lon': str(addr.lon),
